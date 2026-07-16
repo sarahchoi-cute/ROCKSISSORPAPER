@@ -1,59 +1,317 @@
-<div>Teachable Machine Image Model</div>
-<button type="button" onclick="init()">Start</button>
-<div id="webcam-container"></div>
-<div id="label-container"></div>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-<script type="text/javascript">
-    // More API functions here:
-    // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/image
-
-    // the link to your model provided by Teachable Machine export panel
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>가위바위보 게임</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card-bg: #ffffff;
+    --primary: #4f46e5;
+    --primary-dark: #3730a3;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  }
+ 
+  * {
+    box-sizing: border-box;
+  }
+ 
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(180deg, #eef2ff 0%, var(--bg) 100%);
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px 60px;
+  }
+ 
+  .app {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+ 
+  h1 {
+    font-size: clamp(22px, 5vw, 30px);
+    margin: 8px 0 0;
+    text-align: center;
+  }
+ 
+  .subtitle {
+    color: var(--muted);
+    font-size: 14px;
+    text-align: center;
+    margin: -12px 0 4px;
+  }
+ 
+  .start-btn {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 12px 28px;
+    border-radius: 999px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .start-btn:hover {
+    background: var(--primary-dark);
+    transform: translateY(-1px);
+  }
+  .start-btn:active {
+    transform: translateY(0);
+  }
+  .start-btn:disabled {
+    background: var(--muted);
+    cursor: default;
+    transform: none;
+  }
+ 
+  .webcam-card {
+    width: 100%;
+    background: var(--card-bg);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    padding: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+ 
+  /* 티처블머신이 캔버스를 200x200 고정 크기로 삽입하므로
+     래퍼를 비율 기반 반응형 컨테이너로 감싸서 스케일링 */
+  #webcam-container {
+    position: relative;
+    width: 100%;
+    max-width: 320px;
+    aspect-ratio: 1 / 1;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #111;
+  }
+ 
+  #webcam-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+  }
+ 
+  .result-card {
+    width: 100%;
+    background: var(--card-bg);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    padding: 28px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-height: 140px;
+    justify-content: center;
+  }
+ 
+  .result-emoji {
+    font-size: clamp(56px, 16vw, 84px);
+    line-height: 1;
+    transition: transform 0.2s ease;
+  }
+ 
+  .result-emoji.pop {
+    animation: pop 0.25s ease;
+  }
+ 
+  @keyframes pop {
+    0% { transform: scale(0.8); }
+    60% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+ 
+  .result-label {
+    font-size: clamp(20px, 6vw, 28px);
+    font-weight: 700;
+    color: var(--primary-dark);
+  }
+ 
+  .result-status {
+    font-size: 13px;
+    color: var(--muted);
+  }
+ 
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    max-width: 360px;
+    line-height: 1.5;
+  }
+ 
+  footer {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+ 
+  /* 모바일 화면 대응 */
+  @media (max-width: 400px) {
+    .webcam-card, .result-card {
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .result-card {
+      min-height: 110px;
+    }
+  }
+ 
+  /* 작은 화면에서 카드 사이 간격 축소 */
+  @media (max-width: 340px) {
+    .app { gap: 14px; }
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <h1>✊✌️🖐️ 가위바위보 인식기</h1>
+    <p class="subtitle">웹캠에 손 모양을 보여주면 자동으로 인식합니다</p>
+ 
+    <button id="startBtn" class="start-btn" type="button" onclick="init()">시작하기</button>
+ 
+    <div class="webcam-card">
+      <div id="webcam-container"></div>
+    </div>
+ 
+    <div class="result-card">
+      <div id="resultEmoji" class="result-emoji">🤖</div>
+      <div id="resultLabel" class="result-label">대기 중...</div>
+      <div id="resultStatus" class="result-status"></div>
+    </div>
+ 
+    <p class="hint">
+      손 모양을 잠시 유지하면 결과가 표시됩니다. 손을 바꾸는 도중에는
+      결과가 갱신되지 않아 화면이 빠르게 깜빡이지 않습니다.
+    </p>
+ 
+    <footer>Powered by Teachable Machine</footer>
+  </div>
+ 
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+  <script type="text/javascript">
+    // ====== 설정 ======
     const URL = "https://teachablemachine.withgoogle.com/models/yNgVPi4RV/";
-
-    let model, webcam, labelContainer, maxPredictions;
-
-    // Load the image model and setup the webcam
+ 
+    // 클래스명 -> 표시용 라벨/이모지 매핑
+    // 티처블머신에서 학습한 클래스 이름과 정확히 일치해야 합니다.
+    const DISPLAY_MAP = {
+      "가위": { emoji: "✌️", label: "가위" },
+      "바위": { emoji: "✊", label: "바위" },
+      "보": { emoji: "🖐️", label: "보" },
+      "아무것도 안냄": { emoji: "🤷", label: "아무것도 안냄" }
+    };
+ 
+    // 안정화(디바운스) 관련 설정
+    const CONFIDENCE_THRESHOLD = 0.85; // 이 확률 이상일 때만 후보로 인정
+    const REQUIRED_CONSECUTIVE_FRAMES = 8; // 같은 클래스가 이만큼 연속 감지되어야 화면 갱신
+ 
+    let model, webcam, maxPredictions;
+ 
+    // 안정화용 상태값
+    let candidateClass = null;
+    let candidateCount = 0;
+    let displayedClass = null;
+ 
+    const startBtn = document.getElementById("startBtn");
+    const resultEmoji = document.getElementById("resultEmoji");
+    const resultLabel = document.getElementById("resultLabel");
+    const resultStatus = document.getElementById("resultStatus");
+ 
     async function init() {
-        const modelURL = URL + "model.json";
-        const metadataURL = URL + "metadata.json";
-
-        // load the model and metadata
-        // Refer to tmImage.loadFromFiles() in the API to support files from a file picker
-        // or files from your local hard drive
-        // Note: the pose library adds "tmImage" object to your window (window.tmImage)
-        model = await tmImage.load(modelURL, metadataURL);
-        maxPredictions = model.getTotalClasses();
-
-        // Convenience function to setup a webcam
-        const flip = true; // whether to flip the webcam
-        webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
-        await webcam.setup(); // request access to the webcam
-        await webcam.play();
-        window.requestAnimationFrame(loop);
-
-        // append elements to the DOM
-        document.getElementById("webcam-container").appendChild(webcam.canvas);
-        labelContainer = document.getElementById("label-container");
-        for (let i = 0; i < maxPredictions; i++) { // and class labels
-            labelContainer.appendChild(document.createElement("div"));
-        }
+      startBtn.disabled = true;
+      startBtn.textContent = "로딩 중...";
+ 
+      const modelURL = URL + "model.json";
+      const metadataURL = URL + "metadata.json";
+ 
+      model = await tmImage.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
+ 
+      const flip = true;
+      webcam = new tmImage.Webcam(200, 200, flip);
+      await webcam.setup();
+      await webcam.play();
+      window.requestAnimationFrame(loop);
+ 
+      document.getElementById("webcam-container").appendChild(webcam.canvas);
+ 
+      startBtn.textContent = "인식 중";
+      resultStatus.textContent = "손 모양을 화면에 보여주세요";
     }
-
+ 
     async function loop() {
-        webcam.update(); // update the webcam frame
-        await predict();
-        window.requestAnimationFrame(loop);
+      webcam.update();
+      await predict();
+      window.requestAnimationFrame(loop);
     }
-
-    // run the webcam image through the image model
+ 
     async function predict() {
-        // predict can take in an image, video or canvas html element
-        const prediction = await model.predict(webcam.canvas);
-        for (let i = 0; i < maxPredictions; i++) {
-            const classPrediction =
-                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-            labelContainer.childNodes[i].innerHTML = classPrediction;
+      const prediction = await model.predict(webcam.canvas);
+ 
+      // 확률이 가장 높은 클래스 찾기
+      let top = prediction[0];
+      for (let i = 1; i < prediction.length; i++) {
+        if (prediction[i].probability > top.probability) {
+          top = prediction[i];
         }
+      }
+ 
+      // 신뢰도가 낮으면 후보로 인정하지 않고 카운트 초기화
+      if (top.probability < CONFIDENCE_THRESHOLD) {
+        candidateClass = null;
+        candidateCount = 0;
+        resultStatus.textContent = "인식 중...";
+        return;
+      }
+ 
+      // 같은 클래스가 연속으로 감지되는지 카운트
+      if (top.className === candidateClass) {
+        candidateCount++;
+      } else {
+        candidateClass = top.className;
+        candidateCount = 1;
+      }
+ 
+      // 연속 프레임 조건을 만족하고, 이전 표시값과 다를 때만 화면 갱신
+      if (
+        candidateCount >= REQUIRED_CONSECUTIVE_FRAMES &&
+        candidateClass !== displayedClass
+      ) {
+        displayedClass = candidateClass;
+        updateDisplay(displayedClass);
+      }
     }
-</script>
+ 
+    function updateDisplay(className) {
+      const info = DISPLAY_MAP[className] || { emoji: "❓", label: className };
+ 
+      resultEmoji.textContent = info.emoji;
+      resultLabel.textContent = info.label;
+      resultStatus.textContent = "인식 완료";
+ 
+      // 갱신될 때 살짝 팝 애니메이션
+      resultEmoji.classList.remove("pop");
+      void resultEmoji.offsetWidth; // reflow to restart animation
+      resultEmoji.classList.add("pop");
+    }
+  </script>
+</body>
+</html>
